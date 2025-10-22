@@ -1,0 +1,627 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>polar— Dashboard (All-in-one)</title>
+
+  <!-- Firebase modular SDK (v9) -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-app.js";
+    import {
+      getFirestore, collection, addDoc, query, orderBy, onSnapshot,
+      serverTimestamp, deleteDoc, doc
+    } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore.js";
+    import {
+      getStorage, ref, uploadBytes, getDownloadURL, deleteObject
+    } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-storage.js";
+
+    // ------------------- Firebase config -------------------
+    const firebaseConfig = {
+      apiKey: "AIzaSyAU1VUMYDIcNq8pd9wS3qSvUV9CwCl6baE",
+      authDomain: "class-web-4bf8c.firebaseapp.com",
+      projectId: "class-web-4bf8c",
+      storageBucket: "class-web-4bf8c.firebasestorage.app",
+      messagingSenderId: "794537529823",
+      appId: "1:794537529823:web:3bda35f950967e705f346a"
+    };
+    // -------------------------------------------------------
+
+    // initialize
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+    const storage = getStorage(app);
+
+    // expose firebase helpers to window for later code
+    window.FB = { db, storage, addDoc, collection, query, orderBy, onSnapshot, serverTimestamp, ref, uploadBytes, getDownloadURL, deleteDoc, doc, deleteObject };
+
+  </script>
+
+  <style>
+    :root{
+      --bg:#07080b;
+      --panel:#0f1220;
+      --card:#0b0f16;
+      --muted:#9aa4b2;
+      --accent:#06b6d4;
+      --accent-2:#7c3aed;
+      --text:#e6eef8;
+    }
+    *{box-sizing:border-box}
+    body{margin:0;font-family:Inter,system-ui,Roboto,Arial;background:linear-gradient(180deg,#04050a,#0b0f16);color:var(--text)}
+    .app{display:flex;min-height:100vh}
+
+    /* Sidebar */
+    .sidebar{width:240px;padding:20px;background:linear-gradient(180deg,#071028,#0c1224);position:fixed;left:0;top:0;bottom:0}
+    .brand{display:flex;align-items:center;gap:12px;margin-bottom:18px}
+    .logo{width:46px;height:46px;border-radius:10px;background:linear-gradient(135deg,var(--accent),var(--accent-2));display:flex;align-items:center;justify-content:center;font-weight:700;color:#021025}
+    .brand h2{margin:0;font-size:18px}
+    .subtitle{color:var(--muted);font-size:13px;margin-top:4px}
+
+    .nav{margin-top:16px;display:flex;flex-direction:column;gap:8px}
+    .nav button{background:transparent;border:none;color:var(--text);text-align:left;padding:10px;border-radius:10px;cursor:pointer;font-size:15px}
+    .nav button.active{background:linear-gradient(90deg,rgba(6,182,212,0.12),rgba(124,58,237,0.06));color:var(--accent)}
+    .nav button:hover{transform:translateX(6px);transition:all .12s}
+
+    .sidebar .admin-panel{position:absolute;bottom:20px;left:20px;right:20px}
+    .admin-panel input{width:100%;padding:8px;border-radius:8px;border:1px solid rgba(255,255,255,0.04);background:transparent;color:var(--text);margin-bottom:8px}
+    .admin-panel button{width:100%;padding:8px;border-radius:8px;border:none;background:var(--accent);color:#021025;font-weight:600;cursor:pointer}
+
+    /* Main area */
+    .main{margin-left:260px;padding:22px;flex:1}
+    .topbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:18px}
+    .topbar h1{margin:0;color:var(--accent);text-shadow:0 8px 40px rgba(6,182,212,0.06)}
+    .badge{background:rgba(255,255,255,0.04);padding:6px 10px;border-radius:999px;color:var(--muted)}
+
+    .panel{background:var(--panel);padding:18px;border-radius:14px;margin-bottom:18px;box-shadow:0 10px 40px rgba(0,0,0,0.7)}
+    .card{background:var(--card);padding:14px;border-radius:12px;border:1px solid rgba(6,182,212,0.03);margin-bottom:12px}
+
+    .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px}
+
+    label{display:block;font-weight:600;margin-bottom:6px}
+    input[type="text"], input[type="url"], input[type="file"], textarea, input[type="password"]{
+      width:100%;padding:12px;border-radius:10px;border:1px solid rgba(255,255,255,0.04);background:transparent;color:var(--text);margin-bottom:10px
+    }
+    textarea{min-height:86px}
+    .btn{display:inline-block;padding:10px 14px;border-radius:10px;border:none;background:linear-gradient(90deg,var(--accent),var(--accent-2));color:#021025;font-weight:700;cursor:pointer}
+
+    .member-card img{width:100%;height:200px;object-fit:cover;border-radius:10px;margin-bottom:10px}
+    .member-card h3{margin:6px 0 4px}
+    .links a{display:inline-block;margin-right:10px;color:var(--accent);text-decoration:none;font-weight:600}
+
+    .chat-list{max-height:320px;overflow:auto;padding:8px;border-radius:10px;background:rgba(255,255,255,0.02);margin-bottom:8px}
+    .chat-message{padding:8px;border-bottom:1px solid rgba(255,255,255,0.02)}
+    .chat-form{display:flex;gap:8px}
+    .chat-form input{flex:1}
+
+    .tiktok-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:12px}
+    .tiktok-embed{background:transparent;border-radius:12px;padding:8px;border:1px solid rgba(255,255,255,0.02)}
+
+    .small-del{background:#ff4d4f;color:white;padding:6px 8px;border-radius:8px;border:none;cursor:pointer;font-weight:700;margin-left:8px}
+
+    @media (max-width:850px){
+      .sidebar{position:fixed;left:0;top:0;bottom:0;width:200px;z-index:50}
+      .main{margin-left:210px;padding:14px}
+      .grid{grid-template-columns:repeat(auto-fill,minmax(200px,1fr))}
+    }
+  </style>
+</head>
+
+<body>
+  <div class="app">
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="logo">☆</div>
+        <div>
+          <h2>polar☆</h2>
+          <div class="subtitle">Class Dashboard 
+     </div>
+      </div>
+
+      <nav class="nav" id="nav">
+        <button class="active" data-view="home">Home</button>
+        <button data-view="members">Members</button>
+        <button data-view="memes">Memes</button>
+        <button data-view="chat">Chat</button>
+        <button data-view="tiktok">TikTok</button>
+        <button data-view="apps">Apps</button>
+        <button data-view="admin">Admin</button>
+      </nav>
+
+      <div class="admin-panel">
+        <input id="adminPasswordShort" type="password" placeholder="Admin password (quick)"/>
+        <button id="quickUnlockBtn">Unlock</button>
+      </div>
+    </aside>
+
+    <main class="main">
+      <div class="topbar">
+        <h1>Celestial R</h1>
+        <div class="badge" id="adminBadge">Guest</div>
+      </div>
+
+      <!-- HOME -->
+      <section id="view-home" class="panel">
+        <h2 style="color:var(--accent)">About Our Class</h2>
+        <div class="card">
+          <p>Welcome to <strong>Celestial R</strong> — a space for our class to share memories, laughs, and stay connected. Use the Admin panel to add members, memes, TikToks and Apps.</p>
+        </div>
+
+        <div class="grid">
+          <div class="card">
+            <h3 style="color:var(--accent)">Connect</h3>
+            <p class="muted">Members directory with WhatsApp & Instagram links.</p>
+          </div>
+          <div class="card">
+            <h3 style="color:var(--accent-2)">Memes</h3>
+            <p class="muted">Upload and enjoy class memes.</p>
+          </div>
+          <div class="card">
+            <h3 style="color:var(--accent)">Chat</h3>
+            <p class="muted">Live class chat (real-time).</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- MEMBERS -->
+      <section id="view-members" class="panel" style="display:none">
+        <h2>Members</h2>
+        <div id="membersGrid" class="grid"></div>
+      </section>
+
+      <!-- MEMES -->
+      <section id="view-memes" class="panel" style="display:none">
+        <h2>Memes</h2>
+        <div id="memesGrid" class="grid"></div>
+      </section>
+
+      <!-- CHAT -->
+      <section id="view-chat" class="panel" style="display:none">
+        <h2>Class Chat</h2>
+        <div id="chatList" class="chat-list"></div>
+        <div class="card">
+          <div class="chat-form">
+            <input id="chatName" type="text" placeholder="Your name" />
+            <input id="chatText" type="text" placeholder="Message" />
+            <button class="btn" id="chatSendBtn">Send</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- TIKTOK -->
+      <section id="view-tiktok" class="panel" style="display:none">
+        <h2>TikTok — Watch Class Videos</h2>
+        <div class="card" style="margin-bottom:12px">
+          <p class="muted">Admins can add TikTok video URLs in Admin → Add TikTok. Example: <code>https://www.tiktok.com/@username/video/1234567890</code></p>
+        </div>
+        <div id="tiktokGrid" class="tiktok-grid"></div>
+      </section>
+
+      <!-- APPS -->
+      <section id="view-apps" class="panel" style="display:none">
+        <h2>Apps</h2>
+        <div class="card">
+          <p class="muted">Click an app icon to open the Play Store / app link on your phone.</p>
+        </div>
+        <div id="appsGrid" class="grid"></div>
+      </section>
+
+      <!-- ADMIN -->
+      <section id="view-admin" class="panel" style="display:none">
+        <h2>Admin — Add Content (password required)</h2>
+
+        <!-- Add Member -->
+        <div class="card">
+          <h3>Add Member</h3>
+          <form id="addMemberForm" onsubmit="return false;">
+            <label>Name *</label>
+            <input id="m_name" type="text" required />
+
+            <label>Description</label>
+            <textarea id="m_desc"></textarea>
+
+            <label>WhatsApp (with or without +)</label>
+            <input id="m_whatsapp" type="text" placeholder="+2547..." />
+
+            <label>Instagram (with or without @)</label>
+            <input id="m_instagram" type="text" placeholder="@username" />
+
+            <label>Profile Photo</label>
+            <input id="m_photo" type="file" accept="image/*" />
+
+            <label>Admin Password *</label>
+            <input id="m_password" type="password" required />
+
+            <button class="btn" id="m_add_btn">Add Member</button>
+          </form>
+        </div>
+
+        <!-- Add Meme -->
+        <div class="card">
+          <h3>Add Meme (image)</h3>
+          <form id="addMemeForm" onsubmit="return false;">
+            <label>Meme Image</label>
+            <input id="mm_image" type="file" accept="image/*" />
+            <label>Admin Password *</label>
+            <input id="mm_password" type="password" required />
+            <button class="btn" id="mm_add_btn">Upload Meme</button>
+          </form>
+        </div>
+
+        <!-- Add TikTok -->
+        <div class="card">
+          <h3>Add TikTok Video</h3>
+          <form id="addTiktokForm" onsubmit="return false;">
+            <label>TikTok video URL *</label>
+            <input id="tk_url" type="url" placeholder="https://www.tiktok.com/@username/video/..." required />
+            <label>Admin Password *</label>
+            <input id="tk_password" type="password" required />
+            <button class="btn" id="tk_add_btn">Add TikTok</button>
+          </form>
+        </div>
+
+        <!-- Add App -->
+        <div class="card">
+          <h3>Add App (icon + link)</h3>
+          <form id="addAppForm" onsubmit="return false;">
+            <label>App name *</label>
+            <input id="app_name" type="text" required />
+
+            <label>App URL (Play Store or direct link) *</label>
+            <input id="app_url" type="url" placeholder="https://play.google.com/store/apps/details?id=com.example" required />
+
+            <label>App icon (image)</label>
+            <input id="app_icon" type="file" accept="image/*" />
+
+            <label>Admin Password *</label>
+            <input id="app_password" type="password" required />
+
+            <button class="btn" id="app_add_btn">Add App</button>
+          </form>
+        </div>
+
+      </section>
+    </main>
+  </div>
+
+  <script>
+    // Utilities and firebase handles (from module earlier)
+    const { db, storage, addDoc, collection, query, orderBy, onSnapshot, serverTimestamp, ref, uploadBytes, getDownloadURL, deleteDoc, doc, deleteObject } = window.FB;
+
+    // UI navigation
+    const nav = document.getElementById('nav');
+    let adminUnlocked = false;
+
+    nav.addEventListener('click', (e) => {
+      const btn = e.target.closest('button');
+      if (!btn) return;
+      const view = btn.dataset.view;
+      setView(view);
+    });
+
+    function setView(view) {
+      document.querySelectorAll('main section').forEach(sec => sec.style.display = 'none');
+      document.querySelectorAll('#nav button').forEach(b => b.classList.remove('active'));
+      const btn = document.querySelector(`#nav button[data-view="${view}"]`);
+      if(btn) btn.classList.add('active');
+      const el = document.getElementById('view-' + view);
+      if (el) el.style.display = '';
+    }
+
+    // Quick admin unlock
+    document.getElementById('quickUnlockBtn').addEventListener('click', () => {
+      const p = document.getElementById('adminPasswordShort').value;
+      if (p === 'celestial2025') {
+        adminUnlocked = true;
+        document.getElementById('adminBadge').textContent = 'Admin';
+        alert('Admin unlocked');
+        renderAll(); // re-render UI so delete buttons appear
+      } else {
+        alert('Wrong password');
+      }
+    });
+
+    // ESCAPE util
+    function escapeHtml(str) {
+      if (!str) return '';
+      return String(str).replace(/[&<>"'`]/g, function (s) {
+        return ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;', '`':'&#x60;' })[s];
+      });
+    }
+
+    /* ------------------ MEMBERS ------------------ */
+    async function addMemberAdmin(formValues) {
+      // upload photo if exists
+      let photoUrl = "";
+      let photoRefPath = "";
+      if (formValues.photoFile) {
+        const fileRef = ref(storage, `members/${Date.now()}_${formValues.photoFile.name}`);
+        await uploadBytes(fileRef, formValues.photoFile);
+        photoRefPath = fileRef.fullPath;
+        photoUrl = await getDownloadURL(fileRef);
+      }
+
+      await addDoc(collection(db, 'classMembers'), {
+        name: formValues.name,
+        description: formValues.description || "",
+        number: formValues.whatsapp || "",
+        instagram: formValues.instagram || "",
+        imageUrl: photoUrl,
+        storagePath: photoRefPath,
+        createdAt: serverTimestamp()
+      });
+    }
+
+    document.getElementById('m_add_btn').addEventListener('click', async () => {
+      const pw = document.getElementById('m_password').value;
+      if (pw !== 'celestial2025') { alert('Wrong admin password'); return; }
+      const name = document.getElementById('m_name').value.trim();
+      if (!name) { alert('Name required'); return; }
+      const photoFile = document.getElementById('m_photo').files[0];
+      const data = {
+        name,
+        description: document.getElementById('m_desc').value,
+        whatsapp: document.getElementById('m_whatsapp').value,
+        instagram: document.getElementById('m_instagram').value,
+        photoFile
+      };
+      try {
+        await addMemberAdmin(data);
+        alert('Member added');
+        document.getElementById('addMemberForm').reset();
+      } catch (e) {
+        console.error(e);
+        alert('Error: ' + e.message);
+      }
+    });
+
+    const membersGrid = document.getElementById('membersGrid');
+    const membersQuery = query(collection(db, 'classMembers'), orderBy('createdAt','desc'));
+    onSnapshot(membersQuery, snap => {
+      membersGrid.innerHTML = '';
+      snap.forEach(docSnap => {
+        const m = docSnap.data();
+        const id = docSnap.id;
+        const div = document.createElement('div');
+        div.className = 'card member-card';
+        const imgHtml = m.imageUrl ? `<img src="${m.imageUrl}" alt="${escapeHtml(m.name)}" />` : `<div style="height:200px;background:#0a0d12;border-radius:10px;display:flex;align-items:center;justify-content:center;color:var(--muted)">No photo</div>`;
+        const num = (m.number || '').toString().trim();
+        let waHref = '#';
+        if (num) {
+          const cleaned = num.replace(/\s+/g, '').replace(/^\+/, '');
+          waHref = `https://wa.me/${cleaned}`;
+        }
+        const inst = (m.instagram||'').replace(/^@/,'');
+        const instHref = inst ? `https://instagram.com/${inst}` : '#';
+        let delBtn = '';
+        if (adminUnlocked) {
+          delBtn = `<button class="small-del" onclick="deleteItem('classMembers','${id}','${m.storagePath || ''}')">DELETE</button>`;
+        }
+        div.innerHTML = `
+          ${imgHtml}
+          <h3>${escapeHtml(m.name)} ${delBtn}</h3>
+          <p class="muted">${escapeHtml(m.description || '')}</p>
+          <div class="links">
+            ${num ? `<a href="${waHref}" target="_blank">WhatsApp</a>` : ''}
+            ${inst ? `<a href="${instHref}" target="_blank">Instagram</a>` : ''}
+          </div>
+        `;
+        membersGrid.appendChild(div);
+      });
+    });
+
+    /* ------------------ MEMES ------------------ */
+    async function uploadMemeAdmin(file) {
+      const fileRef = ref(storage, `memes/${Date.now()}_${file.name}`);
+      await uploadBytes(fileRef, file);
+      const url = await getDownloadURL(fileRef);
+      await addDoc(collection(db, 'memes'), { imageUrl: url, storagePath: fileRef.fullPath, createdAt: serverTimestamp() });
+    }
+
+    document.getElementById('mm_add_btn').addEventListener('click', async () => {
+      const pw = document.getElementById('mm_password').value;
+      if (pw !== 'celestial2025') { alert('Wrong admin password'); return; }
+      const file = document.getElementById('mm_image').files[0];
+      if (!file) { alert('Choose an image'); return; }
+      try {
+        await uploadMemeAdmin(file);
+        alert('Meme uploaded!');
+        document.getElementById('addMemeForm').reset();
+      } catch (e) {
+        console.error(e);
+        alert('Upload error: '+ e.message);
+      }
+    });
+
+    const memesGrid = document.getElementById('memesGrid');
+    const memesQuery = query(collection(db, 'memes'), orderBy('createdAt','desc'));
+    onSnapshot(memesQuery, snap => {
+      memesGrid.innerHTML = '';
+      snap.forEach(docSnap => {
+        const m = docSnap.data();
+        const id = docSnap.id;
+        const d = document.createElement('div');
+        d.className = 'card';
+        const del = adminUnlocked ? `<button class="small-del" onclick="deleteItem('memes','${id}','${m.storagePath || ''}')">DELETE</button>` : '';
+        d.innerHTML = `${del}<img src="${m.imageUrl}" style="width:100%;height:180px;object-fit:cover;border-radius:10px" />`;
+        memesGrid.appendChild(d);
+      });
+    });
+
+    /* ------------------ CHAT ------------------ */
+    const chatList = document.getElementById('chatList');
+    const chatSendBtn = document.getElementById('chatSendBtn');
+    const chatName = document.getElementById('chatName');
+    const chatText = document.getElementById('chatText');
+
+    async function sendChatMessage() {
+      const name = chatName.value.trim();
+      const text = chatText.value.trim();
+      if (!name) { alert('Enter your name'); return; }
+      if (!text) return;
+      try {
+        await addDoc(collection(db, 'messages'), { name, text, createdAt: serverTimestamp() });
+        chatText.value = '';
+      } catch (e) {
+        console.error(e);
+        alert('Send failed: '+e.message);
+      }
+    }
+
+    chatSendBtn.addEventListener('click', sendChatMessage);
+    chatText.addEventListener('keydown', (e) => { if (e.key === 'Enter') sendChatMessage(); });
+
+    const messagesQuery = query(collection(db, 'messages'), orderBy('createdAt','asc'));
+    onSnapshot(messagesQuery, snap => {
+      chatList.innerHTML = '';
+      snap.forEach(docSnap => {
+        const m = docSnap.data();
+        const el = document.createElement('div');
+        el.className = 'chat-message';
+        el.innerHTML = `<strong>${escapeHtml(m.name)}</strong><div>${escapeHtml(m.text)}</div>`;
+        chatList.appendChild(el);
+      });
+      chatList.scrollTop = chatList.scrollHeight;
+    });
+
+    /* ------------------ TIKTOKS ------------------ */
+    async function addTiktokAdmin(url) {
+      await addDoc(collection(db, 'tiktoks'), { url, createdAt: serverTimestamp() });
+    }
+
+    document.getElementById('tk_add_btn').addEventListener('click', async () => {
+      const pw = document.getElementById('tk_password').value;
+      if (pw !== 'celestial2025') { alert('Wrong admin password'); return; }
+      const url = document.getElementById('tk_url').value.trim();
+      if (!url) { alert('Enter URL'); return; }
+      try {
+        await addTiktokAdmin(url);
+        alert('TikTok added');
+        document.getElementById('addTiktokForm').reset();
+      } catch (e) {
+        console.error(e);
+        alert('Error: '+e.message);
+      }
+    });
+
+    const tiktokGrid = document.getElementById('tiktokGrid');
+    const tiktokQuery = query(collection(db, 'tiktoks'), orderBy('createdAt','desc'));
+    onSnapshot(tiktokQuery, snap => {
+      tiktokGrid.innerHTML = '';
+      snap.forEach(docSnap => {
+        const t = docSnap.data();
+        const id = docSnap.id;
+        const container = document.createElement('div');
+        container.className = 'tiktok-embed card';
+        const del = adminUnlocked ? `<button class="small-del" onclick="deleteItem('tiktoks','${id}','')">DELETE</button>` : '';
+        const url = t.url;
+        const esc = escapeHtml(url);
+        container.innerHTML = `${del}<blockquote class="tiktok-embed" cite="${esc}" data-video-id="" style="max-width: 100%;min-height:300px;"><a href="${esc}">${esc}</a></blockquote>`;
+        tiktokGrid.appendChild(container);
+      });
+      loadTiktokEmbedScript();
+    });
+
+    function loadTiktokEmbedScript() {
+      if (document.getElementById('tiktokScript')) return;
+      const s = document.createElement('script');
+      s.id = 'tiktokScript';
+      s.src = 'https://www.tiktok.com/embed.js';
+      s.async = true;
+      document.body.appendChild(s);
+    }
+
+    /* ------------------ APPS ------------------ */
+    async function addAppAdmin(name, url, iconFile) {
+      let iconUrl = '';
+      let iconPath = '';
+      if (iconFile) {
+        const fileRef = ref(storage, `apps/${Date.now()}_${iconFile.name}`);
+        await uploadBytes(fileRef, iconFile);
+        iconPath = fileRef.fullPath;
+        iconUrl = await getDownloadURL(fileRef);
+      }
+      await addDoc(collection(db, 'apps'), { name, url, iconUrl, storagePath: iconPath, createdAt: serverTimestamp() });
+    }
+
+    document.getElementById('app_add_btn').addEventListener('click', async () => {
+      const pw = document.getElementById('app_password').value;
+      if (pw !== 'celestial2025') { alert('Wrong admin password'); return; }
+      const name = document.getElementById('app_name').value.trim();
+      const url = document.getElementById('app_url').value.trim();
+      const iconFile = document.getElementById('app_icon').files[0];
+      if (!name || !url) { alert('Name and URL required'); return; }
+      try {
+        await addAppAdmin(name, url, iconFile);
+        alert('App added');
+        document.getElementById('addAppForm').reset();
+      } catch (e) {
+        console.error(e);
+        alert('Error: ' + e.message);
+      }
+    });
+
+    const appsGrid = document.getElementById('appsGrid');
+    const appsQuery = query(collection(db, 'apps'), orderBy('createdAt','desc'));
+    onSnapshot(appsQuery, snap => {
+      appsGrid.innerHTML = '';
+      snap.forEach(docSnap => {
+        const a = docSnap.data();
+        const id = docSnap.id;
+        const d = document.createElement('div');
+        d.className = 'card';
+        const del = adminUnlocked ? `<button class="small-del" onclick="deleteItem('apps','${id}','${a.storagePath || ''}')">DELETE</button>` : '';
+        const icon = a.iconUrl ? `<img src="${a.iconUrl}" style="width:100%;height:100px;object-fit:contain;border-radius:8px;background:rgba(255,255,255,0.02);padding:6px" />` : `<div style="height:100px;display:flex;align-items:center;justify-content:center;color:var(--muted)">No icon</div>`;
+        d.innerHTML = `${del}<a href="${escapeHtml(a.url)}" target="_blank" style="text-decoration:none;color:inherit">${icon}<h3 style="margin-top:8px">${escapeHtml(a.name)}</h3></a>`;
+        appsGrid.appendChild(d);
+      });
+    });
+
+    /* ------------------ DELETE (admin only) ------------------ */
+    // global delete function - called from onclick attributes in rendered HTML
+    window.deleteItem = async function(collectionName, id, storagePath) {
+      if (!adminUnlocked) {
+        const pw = prompt('Enter admin password to delete:');
+        if (pw !== 'celestial2025') { alert('Wrong password'); return; }
+        adminUnlocked = true;
+        document.getElementById('adminBadge').textContent = 'Admin';
+        renderAll();
+      }
+      if (!confirm('Delete this item?')) return;
+      try {
+        // delete document
+        await deleteDoc(doc(db, collectionName, id));
+        // delete storage file if provided
+        if (storagePath) {
+          try {
+            const objRef = ref(storage, storagePath);
+            await deleteObject(objRef);
+          } catch (e) {
+            // storage delete might fail if path empty / missing - ignore
+            console.warn('storage delete:', e);
+          }
+        }
+        alert('Deleted');
+      } catch (e) {
+        console.error(e);
+        alert('Delete failed: ' + e.message);
+      }
+    };
+
+    /* ------------------ helper to re-render UI when admin unlocked ------------------ */
+    function renderAll() {
+      // trigger re-render by re-subscribing (simple approach: just toggle views)
+      const activeBtn = document.querySelector('#nav button.active');
+      const view = activeBtn ? activeBtn.dataset.view : 'home';
+      setView('home');
+      setTimeout(()=> setView(view), 50);
+    }
+
+    // init
+    (function init() {
+      setView('home');
+      // load tiktok embed script lazily when page open; will be triggered by onSnapshot already.
+    })();
+  </script>
+</body>
+  </html>
