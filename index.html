@@ -136,7 +136,7 @@
 
     <main class="main">
       <div class="topbar">
-        <h1>Celestial R</h1>
+        <h1>Polar high</h1>
         <div class="badge" id="adminBadge">Guest</div>
       </div>
 
@@ -582,7 +582,7 @@
     window.deleteItem = async function(collectionName, id, storagePath) {
       if (!adminUnlocked) {
         const pw = prompt('Enter admin password to delete:');
-        if (pw !== 'celestial2025') { alert('Wrong password'); return; }
+        if (pw !== 'deo2025') { alert('Wrong password'); return; }
         adminUnlocked = true;
         document.getElementById('adminBadge').textContent = 'Admin';
         renderAll();
